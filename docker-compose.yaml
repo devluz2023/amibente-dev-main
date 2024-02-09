@@ -47,3 +47,22 @@ services:
   #   volumes:
   #     - ./dev-php:/app/
 
+  # dev-c:
+  #   build:
+  #     context: dev-c
+  #     dockerfile: Dockerfile.dev
+  #   container_name: dev-c
+  #   ports:
+  #     - "8004:8004"
+  #   volumes:
+  #     - ./dev-c:/app/
+
+  # dev-cpp:
+  #   build:
+  #     context: dev-cpp
+  #     dockerfile: Dockerfile.dev
+  #   container_name: dev-cpp
+  #   ports:
+  #     - "8005:8005"
+  #   volumes:
+  #     - ./dev-cpp:/app/
