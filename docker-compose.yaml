@@ -2,7 +2,6 @@ version: '3.8'
 
 services:
   dev-nodejs:
-  
     build:
       context: dev-nodejs
       dockerfile: Dockerfile.dev
@@ -20,3 +19,31 @@ services:
       - "5001:5001"
     volumes:
       - ./dev-python:/app/
+  # dev-java:
+  #   build:
+  #     context: dev-java
+  #     dockerfile: Dockerfile.dev
+  #   container_name: dev-java
+  #   ports:
+  #     - "8001:8001"
+  #   volumes:
+  #     - ./dev-java:/app/
+  # dev-dotnet:
+  #   build:
+  #     context: dev-dotnet
+  #     dockerfile: Dockerfile.dev
+  #   container_name: dev-dotnet
+  #   ports:
+  #     - "8002:8002"
+  #   volumes:
+  #     - ./dev-dotnet:/app/
+  # dev-php:
+  #   build:
+  #     context: dev-php
+  #     dockerfile: Dockerfile.dev
+  #   container_name: dev-php
+  #   ports:
+  #     - "8003:8003"
+  #   volumes:
+  #     - ./dev-php:/app/
+
