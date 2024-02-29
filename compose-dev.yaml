@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 
 services:
 
@@ -86,15 +86,17 @@ services:
 
   kafdrop:
     image: obsidiandynamics/kafdrop:latest
-    networks: 
+    # platforms:
+    #   - linux/arm64  # Specify the architecture for M1 Mac
+    networks:
       - broker-kafka
     depends_on:
       - kafka
     ports:
       - 19000:9000
     environment:
+      KAFKA_BROKERCONNE: "kafka:29092"
       KAFKA_BROKERCONNECT: kafka:29092
-
 
 networks: 
   broker-kafka:

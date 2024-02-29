@@ -1,68 +1,122 @@
 version: '3.8'
 
 services:
+
   dev-nodejs:
+    container_name: dev_nodejs
+    hostname: db_nodejs
     build:
       context: dev-nodejs
       dockerfile: Dockerfile.dev
-    container_name: dev-nodejs
-    ports:
-      - "3001:3001"
-    volumes:
-      - ./dev-nodejs:/app/
+    secrets:
+      - db-password
+    depends_on:
+      - db
+      - redis
+      - kafka
+
   dev-python:
+    container_name: dev_python2
+    hostname: db_python2
     build:
       context: dev-python
       dockerfile: Dockerfile.dev
-    container_name: dev-python
-    ports:
-      - "5001:5001"
+    secrets:
+      - db-password
+    depends_on:
+      - db
+      - redis
+      - kafka
+
+  db:
+    image: mariadb
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 3s
+      retries: 5
+      start_period: 30s
+    secrets:
+      - db-password
     volumes:
-      - ./dev-python:/app/
-  # dev-java:
-  #   build:
-  #     context: dev-java
-  #     dockerfile: Dockerfile.dev
-  #   container_name: dev-java
-  #   ports:
-  #     - "8001:8001"
-  #   volumes:
-  #     - ./dev-java:/app/
-  # dev-dotnet:
-  #   build:
-  #     context: dev-dotnet
-  #     dockerfile: Dockerfile.dev
-  #   container_name: dev-dotnet
-  #   ports:
-  #     - "8002:8002"
-  #   volumes:
-  #     - ./dev-dotnet:/app/
-  # dev-php:
-  #   build:
-  #     context: dev-php
-  #     dockerfile: Dockerfile.dev
-  #   container_name: dev-php
-  #   ports:
-  #     - "8003:8003"
-  #   volumes:
-  #     - ./dev-php:/app/
+      - db-data:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=example
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/db-password
+    ports:
+      - 3306:3306
 
-  # dev-c:
-  #   build:
-  #     context: dev-c
-  #     dockerfile: Dockerfile.dev
-  #   container_name: dev-c
-  #   ports:
-  #     - "8004:8004"
-  #   volumes:
-  #     - ./dev-c:/app/
+  proxy:
+    build: proxy
+    ports:
+      - 8083:80
+    depends_on:
+      - dev-nodejs
+      - dev-python
 
-  # dev-cpp:
-  #   build:
-  #     context: dev-cpp
-  #     dockerfile: Dockerfile.dev
-  #   container_name: dev-cpp
-  #   ports:
-  #     - "8005:8005"
-  #   volumes:
-  #     - ./dev-cpp:/app/
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    networks: 
+      - broker-kafka
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    networks: 
+      - broker-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    networks:
+      - broker-kafka
+    depends_on:
+      - kafka
+    ports:
+      - 19000:9000
+    environment:
+      KAFKA_BROKERCONNE: "kafka:29092"
+      KAFKA_BROKERCONNECT: kafka:29092
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    ports:
+      - "8080:8080"
+    volumes:
+      - jenkins-data:/var/jenkins_home
+
+  flyway:
+    image: boxfuse/flyway
+    volumes:
+      - ./flyway/sql:/flyway/sql
+    command: [migrate]
+
+networks: 
+  broker-kafka:
+    driver: bridge  
+
+volumes:
+  db-data:
+  jenkins-data:
+
+secrets:
+  db-password:
+    file: db/password.txt

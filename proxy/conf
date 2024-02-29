@@ -6,6 +6,9 @@ upstream dev-nodejs {
     server dev_nodejs:3001;
 }
 
+upstream dev-nodejs {
+    server dev_nodejs:3001;
+}
 
 server {    
     listen 80;
