@@ -5,6 +5,8 @@ services:
   dev-nodejs:
     container_name: dev_nodejs
     hostname: db_nodejs
+    networks: 
+      - broker-kafka
     build:
       context: dev-nodejs
       dockerfile: Dockerfile.dev
@@ -18,6 +20,8 @@ services:
   dev-python:
     container_name: dev_python2
     hostname: db_python2
+    networks: 
+      - broker-kafka
     build:
       context: dev-python
       dockerfile: Dockerfile.dev
@@ -31,6 +35,8 @@ services:
   db:
     image: mariadb
     restart: always
+    networks: 
+      - broker-kafka
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
       interval: 3s
@@ -48,18 +54,56 @@ services:
 
   proxy:
     build: proxy
+    networks: 
+      - broker-kafka
+    
     ports:
       - 8083:80
     depends_on:
       - dev-nodejs
       - dev-python
+      - sonarqube
 
   redis:
     image: redis
     container_name: redis
+    networks: 
+      - broker-kafka
     ports:
       - "6379:6379"
 
+  mongo:
+    container_name: mongo
+    hostname: mongo
+    labels:
+        description: Agile Data Science 2.0 MongoDB
+        name: mongo
+    image: mongo:5.0.3
+    restart: always
+    ports:
+        - "27017:27017"
+    volumes:
+        - mongo_data:/data/db
+    networks: 
+      - broker-kafka
+
+  mongo-express:
+    container_name: mongo-express
+    networks: 
+      - broker-kafka
+    hostname: mongo-express
+    labels:
+        description: Agile Data Science 2.0 Mongo Express
+        name: mongo-express
+    image: mongo-express:0.54.0
+    depends_on:
+        - mongo
+    restart: always
+    ports:
+        - 8081:8081
+    environment:
+        ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
+   
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     networks: 
@@ -97,14 +141,57 @@ services:
       KAFKA_BROKERCONNECT: kafka:29092
 
   jenkins:
-    image: jenkins/jenkins:lts
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    networks: 
+      - devops-ci-cd
     ports:
       - "8080:8080"
     volumes:
-      - jenkins-data:/var/jenkins_home
+      - ./jenkins/jenkins-data:/var/jenkins_home
+      - ./jenkins:/home
+
+
+  sonarqube:
+    image: sonarqube:community
+    networks: 
+      - devops-ci-cd
+    depends_on:
+    - postgres
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./sonarqube/sonarqube_data:/opt/sonarqube/data
+      - ./sonarqube/sonarqube_extensions:/opt/sonarqube/extensions
+      - ./sonarqube/sonarqube_logs:/opt/sonarqube/logs
+    environment:
+      - sonar.jdbc.url=jdbc:postgresql://postgres:5432/sonar
+      - sonar.jdbc.username=postgres
+      - sonar.jdbc.password=postgres
+
+  postgres:
+    container_name: postgres
+    networks: 
+      - devops-ci-cd
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sonar
+    volumes:
+      - ./postgres/postgresql:/var/lib/postgresql
+      - ./postgres/postgresql_data:/var/lib/postgresql/data
+    ports:
+    - "5432:5432"
+
 
   flyway:
     image: boxfuse/flyway
+    networks: 
+      - devops-ci-cd
+    env_file:
+      - db/flyway.env
     volumes:
       - ./flyway/sql:/flyway/sql
     command: [migrate]
@@ -112,10 +199,20 @@ services:
 networks: 
   broker-kafka:
     driver: bridge  
+ 
+  devops-ci-cd:
+    driver: bridge
 
 volumes:
   db-data:
   jenkins-data:
+  jenkins:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  mongo_data:
+  postgresql:
+  postgresql_data:
 
 secrets:
   db-password:

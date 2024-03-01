@@ -1,0 +1,115 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1400.v7fd111b_ec82f">
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>1</daysToKeep>
+        <numToKeep>2</numToKeep>
+        <artifactDaysToKeep>1</artifactDaysToKeep>
+        <artifactNumToKeep>2</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+      <abortPrevious>true</abortPrevious>
+    </org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.DisableResumeJobProperty/>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H H/2 * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3867.v535458ce43fd">
+    <script>def remote = [:]
+remote.name = &quot;node-1&quot;
+remote.host = &quot;18.231.158.75&quot;
+remote.allowAnyHosts = true
+
+pipeline {
+    agent any
+    environment {
+        IMAGE_TAG = &apos;latest&apos; // or use ${env.BUILD_NUMBER}
+        REPOSITORY_NAME_BITBUCKET = &apos;samplehellworlddocker&apos;
+        PROJECT_BITBUCKET = &apos;evostack-tecnologia&apos;
+        CONTAINER_PORT = 8080
+   
+    }
+
+    stages {
+        stage(&apos;SCM&apos;) {
+            steps {
+                script {
+                    try {
+                        git branch: &apos;master&apos;,
+                            credentialsId: &apos;evostackbitbucket&apos;,
+                            url: &quot;git@bitbucket.org:${PROJECT_BITBUCKET}/${REPOSITORY_NAME_BITBUCKET}.git&quot;
+                    } catch (Exception e) {
+                        currentBuild.result = &apos;FAILURE&apos;
+                        error(&quot;Failed in SCM stage: ${e.message}&quot;)
+                    }
+                }
+            }
+        }
+        
+        stage(&apos;SonarQube Analysis&apos;) {
+            steps {
+                script {
+                    try {
+                        withCredentials([string(credentialsId: &apos;sonarqube-app&apos;, variable: &apos;SONAR_TOKEN&apos;)]) {
+                            def scannerHome = tool &apos;SonarScanner&apos;
+                            def projectName = &quot;${REPOSITORY_NAME_BITBUCKET}&quot;
+                            def sonarHostUrl = &quot;http://localhost:9000&quot;
+                            echo &quot;Creating SonarQube project...&quot;
+                            sh &quot;${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${projectName} -Dsonar.python.version=3 -Dsonar.host.url=${sonarHostUrl} -Dsonar.login=${SONAR_TOKEN}&quot;
+                        }
+                    } catch (Exception e) {
+                        slackSend(color: &apos;#FF0000&apos;, message: &quot;Failed to scan on sonar stage: ${e.message}&quot;)
+                        error(&quot;Failed to Scan: ${e.message}&quot;)
+                    }
+                }
+            }
+        }
+
+      stage(&apos;Deploy Locally&apos;) {
+            steps {
+                script {
+                    try {
+                        sshagent(credentials: [&apos;ssh-dev&apos;]) {
+                            sh &apos;ssh -o StrictHostKeyChecking=no ubuntu@18.231.158.75 uptime&apos;
+                            sh &apos;ssh -v ubuntu@18.231.158.75&apos;
+                             sh &apos;ssh -o StrictHostKeyChecking=no ubuntu@18.231.158.75 ls -l /home/ubuntu&apos;
+                        sh &apos;ssh -o StrictHostKeyChecking=no ubuntu@18.231.158.75 /home/ubuntu/hello.sh&apos;
+                        }
+                    } catch (Exception e) {
+                        slackSend(color: &apos;#FF0000&apos;, message: &quot;Failed to execute SSH command: ${e.message}&quot;)
+                        error(&quot;Failed to execute SSH command: ${e.message}&quot;)
+                    }
+                }
+            }
+        }
+        stage(&apos;Notify Slack&apos;) {
+            steps {
+                catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;FAILURE&apos;) {
+                    slackSend(color: &apos;#00FF00&apos;, message: &quot;${REPOSITORY_NAME_BITBUCKET} Project deployed locally successfully&quot;)
+                }
+            }
+        }
+    } // End of stages
+} // End of pipeline
+
+
+
+
+
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

@@ -1,0 +1,81 @@
+def remote = [:]
+remote.name = "node-1"
+remote.host = "18.231.158.75"
+remote.allowAnyHosts = true
+
+pipeline {
+    agent any
+    environment {
+        IMAGE_TAG = 'latest' // or use ${env.BUILD_NUMBER}
+        REPOSITORY_NAME_BITBUCKET = 'samplehellworlddocker'
+        PROJECT_BITBUCKET = 'evostack-tecnologia'
+        CONTAINER_PORT = 8080
+   
+    }
+
+    stages {
+        stage('SCM') {
+            steps {
+                script {
+                    try {
+                        git branch: 'master',
+                            credentialsId: 'evostackbitbucket',
+                            url: "git@bitbucket.org:${PROJECT_BITBUCKET}/${REPOSITORY_NAME_BITBUCKET}.git"
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error("Failed in SCM stage: ${e.message}")
+                    }
+                }
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    try {
+                        withCredentials([string(credentialsId: 'sonarqube-app', variable: 'SONAR_TOKEN')]) {
+                            def scannerHome = tool 'SonarScanner'
+                            def projectName = "${REPOSITORY_NAME_BITBUCKET}"
+                            def sonarHostUrl = "http://localhost:9000"
+                            echo "Creating SonarQube project..."
+                            sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${projectName} -Dsonar.python.version=3 -Dsonar.host.url=${sonarHostUrl} -Dsonar.login=${SONAR_TOKEN}"
+                        }
+                    } catch (Exception e) {
+                        slackSend(color: '#FF0000', message: "Failed to scan on sonar stage: ${e.message}")
+                        error("Failed to Scan: ${e.message}")
+                    }
+                }
+            }
+        }
+
+      stage('Deploy Locally') {
+            steps {
+                script {
+                    try {
+                        sshagent(credentials: ['ssh-dev']) {
+                            sh 'ssh -o StrictHostKeyChecking=no ubuntu@18.231.158.75 uptime'
+                            sh 'ssh -v ubuntu@18.231.158.75'
+                             sh 'ssh -o StrictHostKeyChecking=no ubuntu@18.231.158.75 ls -l /home/ubuntu'
+                        sh 'ssh -o StrictHostKeyChecking=no ubuntu@18.231.158.75 /home/ubuntu/hello.sh'
+                        }
+                    } catch (Exception e) {
+                        slackSend(color: '#FF0000', message: "Failed to execute SSH command: ${e.message}")
+                        error("Failed to execute SSH command: ${e.message}")
+                    }
+                }
+            }
+        }
+        stage('Notify Slack') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    slackSend(color: '#00FF00', message: "${REPOSITORY_NAME_BITBUCKET} Project deployed locally successfully")
+                }
+            }
+        }
+    } // End of stages
+} // End of pipeline
+
+
+
+
+
