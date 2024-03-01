@@ -4,10 +4,10 @@
 CLI_JAR="java -jar jenkins-cli.jar"
 
 # Jenkins URL
-JENKINS_URL="http://18.228.255.6:8080/"
+JENKINS_URL="http://localhost:8080/"
 
 # Jenkins authentication credentials
-AUTH="fabio:evo123"
+AUTH="fabio:fabio"
 
 # Function to create credentials domain by XML
 create_credentials() {

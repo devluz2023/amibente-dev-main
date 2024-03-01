@@ -1,0 +1,2 @@
+Host example.com
+    IdentityFile ~/.ssh/id_rsa_example

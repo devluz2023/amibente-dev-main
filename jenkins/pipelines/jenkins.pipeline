@@ -7,8 +7,8 @@ pipeline {
     agent any
     environment {
         IMAGE_TAG = 'latest' // or use ${env.BUILD_NUMBER}
-        REPOSITORY_NAME_BITBUCKET = 'samplehellworlddocker'
-        PROJECT_BITBUCKET = 'evostack-tecnologia'
+    
+        REPOSITORY_NAME = 'amibente-dev-main'
         CONTAINER_PORT = 8080
    
     }
@@ -20,7 +20,7 @@ pipeline {
                     try {
                         git branch: 'master',
                             credentialsId: 'evostackbitbucket',
-                            url: "git@bitbucket.org:${PROJECT_BITBUCKET}/${REPOSITORY_NAME_BITBUCKET}.git"
+                            url: "git@github.com:devluz2023/${REPOSITORY_NAME}.git"
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         error("Failed in SCM stage: ${e.message}")
@@ -35,8 +35,8 @@ pipeline {
                     try {
                         withCredentials([string(credentialsId: 'sonarqube-app', variable: 'SONAR_TOKEN')]) {
                             def scannerHome = tool 'SonarScanner'
-                            def projectName = "${REPOSITORY_NAME_BITBUCKET}"
-                            def sonarHostUrl = "http://localhost:9000"
+                            def projectName = "${REPOSITORY_NAME}"
+                            def sonarHostUrl = "http://sonarqube:9000"
                             echo "Creating SonarQube project..."
                             sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${projectName} -Dsonar.python.version=3 -Dsonar.host.url=${sonarHostUrl} -Dsonar.login=${SONAR_TOKEN}"
                         }
@@ -68,7 +68,7 @@ pipeline {
         stage('Notify Slack') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    slackSend(color: '#00FF00', message: "${REPOSITORY_NAME_BITBUCKET} Project deployed locally successfully")
+                    slackSend(color: '#00FF00', message: "${REPOSITORY_NAME} Project deployed locally successfully")
                 }
             }
         }

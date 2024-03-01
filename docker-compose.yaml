@@ -56,6 +56,7 @@ services:
     build: proxy
     networks: 
       - broker-kafka
+      - proxy
     
     ports:
       - 8083:80
@@ -146,29 +147,35 @@ services:
       dockerfile: Dockerfile
     networks: 
       - devops-ci-cd
+      - proxy
     ports:
       - "8080:8080"
     volumes:
-      - ./jenkins/jenkins-data:/var/jenkins_home
+      -  jenkins-data:/var/jenkins_home
       - ./jenkins:/home
+      - ./jenkins/plugin:/home/var/jenkins_home/plugins
+    
 
 
   sonarqube:
     image: sonarqube:community
+    container_name: sonarqube
     networks: 
       - devops-ci-cd
+      - proxy
     depends_on:
     - postgres
     ports:
       - "9000:9000"
     volumes:
-      - ./sonarqube/sonarqube_data:/opt/sonarqube/data
-      - ./sonarqube/sonarqube_extensions:/opt/sonarqube/extensions
-      - ./sonarqube/sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
     environment:
       - sonar.jdbc.url=jdbc:postgresql://postgres:5432/sonar
       - sonar.jdbc.username=postgres
       - sonar.jdbc.password=postgres
+    # user: "1000:1000"
 
   postgres:
     container_name: postgres
@@ -180,8 +187,8 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: sonar
     volumes:
-      - ./postgres/postgresql:/var/lib/postgresql
-      - ./postgres/postgresql_data:/var/lib/postgresql/data
+      - postgresql:/var/lib/postgresql
+      - postgresql_data:/var/lib/postgresql/data
     ports:
     - "5432:5432"
 
@@ -203,6 +210,9 @@ networks:
   devops-ci-cd:
     driver: bridge
 
+  proxy:
+    driver: bridge
+
 volumes:
   db-data:
   jenkins-data:
@@ -213,6 +223,7 @@ volumes:
   mongo_data:
   postgresql:
   postgresql_data:
+
 
 secrets:
   db-password:
